@@ -1,7 +1,7 @@
+jupyter
 numpy
-scipy
 matplotlib
 scikit-learn
 scikit-image
-jupyter
+elasticdeform
 tensorflow
