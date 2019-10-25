@@ -1,6 +1,6 @@
 ## Model
 The implementation of the U-Net is based on this paper :
-file:///home/elias/T%C3%A9l%C3%A9chargements/paper_erwan_elias_hugo.pdf
+https://arxiv.org/pdf/1505.04597.pdf?fbclid=IwAR0aX0VGI4vMIfr7RJlV_peUAEqbGiUFKNvLH2ZotS2HOpo8898XHz65vBQ
 
 ## Data
 Datasets used come from :
