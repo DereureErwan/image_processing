@@ -61,30 +61,6 @@ class Data:
             y = np.where(y <= 0.5, 0, 1)
         return X, y
 
-    def _extend(self, X, extension=199):
-        X_ = np.zeros((X.shape[0] + 2*extension, X.shape[1] + 2*extension))
-        X_[extension: X.shape[0] + extension, extension: X.shape[1] + extension] = X
-        # Complete X_ at left and right
-        X_[extension:extension+X.shape[0], :extension] =\
-            np.fliplr(X[:, :extension])
-        X_[extension:extension+X.shape[0], -extension:] =\
-            np.fliplr(X[:, -extension:])
-        # Complete X_ at up and down
-        X_[:extension, extension: extension+X.shape[1]:] =\
-            np.flipud(X[:extension, :])
-        X_[-extension:, extension: extension+X.shape[1]:] =\
-            np.flipud(X[-extension:, :])
-        # Complete corners
-        # left-up
-        X_[:extension, :extension] = np.flip(X[:extension, :extension])
-        # left-down
-        X_[-extension:, :extension] = np.flip(X[-extension:, :extension])
-        # right-up
-        X_[:extension, -extension:] = np.flip(X[:extension, -extension:])
-        # right-down
-        X_[-extension:, -extension:] = np.flip(X[-extension:, -extension:])
-        return X_
-
     def generator(self, train=True):
         # TODO: Accept batch size of more than one
         idx = np.arange(0, self.n_samples)
@@ -95,7 +71,7 @@ class Data:
             if train:
                 label = self.labels[s]
                 img, label = self._data_augmentation(img, label)
-            img = self._extend(img, self.extension)
+            img = np.pad(img, self.extension, mode='reflect')
             for i in range(self.iteration):
                 for j in range(self.iteration):
                     img_ = img[
@@ -113,26 +89,3 @@ class Data:
                         )
                     else:
                         yield img_.reshape((1,)+img_.shape+(1,))
-
-    def _compute_weights(self, y):
-        """
-        compute weights for each label image
-        as indicated in the U-Net paper
-        """
-        # XXX: not working
-        raise NotImplementedError
-        class_weights = np.mean(y)
-        size = y.shape[0]
-        y *= -1
-        label = 1
-        for i in range(size):
-            for j in range(size):
-                if y[i, j] == -1:
-                    try:
-                        y[i, j] = list(
-                            set(y[i-1:i+2, j-1:j+2].flatten())
-                            .difference({0, -1})
-                            )[0]
-                    except IndexError:
-                        y[i, j] = label
-                        label += 1

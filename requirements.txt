@@ -4,5 +4,7 @@ scipy
 matplotlib
 scikit-learn
 scikit-image
+tifffile
 elasticdeform
 tensorflow
+tqdm
