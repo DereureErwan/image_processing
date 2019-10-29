@@ -16,6 +16,26 @@ epsilon = backend_config.epsilon
 set_epsilon = backend_config.set_epsilon
 
 
+def make_unet(
+    input_shape,
+    dropout=0.3,
+    batch_normalisation=False,
+    lr=0.001,
+    beta_1=0.9,
+    beta_2=0.999,
+    custom_loss=True,
+):
+    return UNet(
+        input_shape,
+        dropout,
+        batch_normalisation,
+        lr,
+        beta_1,
+        beta_2,
+        custom_loss,
+    )()
+
+
 class UNet:
 
     def __init__(
@@ -101,7 +121,7 @@ class UNet:
                 probability of dropout for contracting path
         """
         images = Input(shape=self.input_shape)
-        loss_weights = Input(shape=self.input_shape)
+        loss_weights = Input(shape=(68, 68, 1))
 
         """""""""""""""""""""""""""""""""""""""""""""""""""
         """""""""""""""" Contracting Path """""""""""""""""
@@ -163,8 +183,8 @@ class UNet:
         """""""""""""""""""""""""""""""""""""""""""""""""""
         """""""""""""""""" Optimization """""""""""""""""""
         """""""""""""""""""""""""""""""""""""""""""""""""""
-
-        model = Model(inputs=[images, loss_weights], outputs=conv10)
+        inputs = [images, loss_weights] if self.custom_loss else images
+        model = Model(inputs=inputs, outputs=conv10)
         optimizer = Adam(
             learning_rate=self.lr,
             beta_1=self.beta_1,
@@ -173,7 +193,7 @@ class UNet:
         # See here : https://github.com/tensorflow/tensorflow/issues/32142
         # XXX: custom loss not tested yet
         loss = UNet.__weighted_b_crossentropy(loss_weights) if self.custom_loss\
-            else 'binary_cross_entropy'
+            else 'binary_crossentropy'
         model.compile(
             optimizer,
             loss=loss,

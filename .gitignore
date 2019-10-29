@@ -10,3 +10,4 @@ personal_experience
 [data]
 # heavy file
 data/train-labels-weights.tif
+*.h5
