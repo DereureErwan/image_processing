@@ -1,28 +1,78 @@
-from unet import UNet
+import json
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, History
+
 from data import Data
+from unet import make_unet
 
 
-D = Data(custom_loss=True)
-model = UNet(input_shape=(267, 267, 1), custom_loss=True)()
+# """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+# """""""""""""""""""""""""""" CONFIG """"""""""""""""""""""""""""
+# """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-try:
-    model.load_weights('models/weighted_bce_loss.h5')
-except FileNotFoundError:
-    pass
+LOAD_PREVIOUS = None
+USE_CUSTOM_LOSS = False
+MODEL_SAVE_PATH = "models/test/bce_loss.h5"
+HISTORY_PATH = "models/history/experience_history.json"
+MODEL_CHECKPOINT = 5
+MODEL_CHECKPOINT_PATH = "models/test/checkpoints/experience_model_{epoch}.h5"
+EPOCHS = 2
+STEPS_PER_EPOCH = None
+
+data_kwargs = {
+    'custom_loss': USE_CUSTOM_LOSS
+}
+
+model_kwargs = {
+    'input_shape': (267, 267, 1),
+    'dropout': 0.3,
+    'batch_normalisation': False,
+    'lr': 0.001,
+    'beta_1': 0.9,
+    'beta_2': 0.999,
+    'custom_loss': USE_CUSTOM_LOSS,
+}
+
+callbacks = []
+callbacks.append(ModelCheckpoint(MODEL_CHECKPOINT_PATH, period=MODEL_CHECKPOINT))
+callbacks.append(TensorBoard(
+    log_dir='models/logs/',
+    histogram_freq=1,
+    write_grads=True,
+    write_images=True,
+    update_freq=30
+))
+callbacks.append(History())
+
+fit_kwargs = {
+    'epochs': EPOCHS,
+    'callbacks': callbacks
+}
 
 
+# """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+# """""""""""""""""""" PREPARE TRAINING """"""""""""""""""""""""""
+# """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-#gpus = tf.config.experimental.list_physical_devices('GPU')
-#if gpus:
-#    # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
-#    try:
-#        tf.config.experimental.set_virtual_device_configuration(
-#            gpus[0],
-#            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=700)])
-#    except RuntimeError as e:
-#        # Virtual devices must be set before GPUs have been initialized
-#        print(e)
+D = Data(**data_kwargs)
+model = make_unet(**model_kwargs)
 
-model.fit_generator(generator=D.generator(), steps_per_epoch=len(D.labels)*144, epochs=10)
+fit_kwargs['generator'] = D.generator()
+fit_kwargs['steps_per_epoch'] = STEPS_PER_EPOCH if STEPS_PER_EPOCH else len(D.labels)*144
+fit_kwargs['validation_data'] = D.generator(validation=True)
+fit_kwargs['validation_steps'] = 10
 
-model.save_weights('weighted_bce_loss.h5')
+
+if LOAD_PREVIOUS is not None:
+    model.load_weights(LOAD_PREVIOUS)
+
+
+# """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+# """"""""""""""""""""""""" TRAINING """""""""""""""""""""""""""""
+# """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+history = model.fit_generator(**fit_kwargs)
+
+model.save_weights(MODEL_SAVE_PATH)
+
+with open(HISTORY_PATH, 'w') as f:
+    json.dump(history.history, f)

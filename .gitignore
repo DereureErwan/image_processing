@@ -11,3 +11,8 @@ personal_experience
 # heavy file
 data/train-labels-weights.tif
 *.h5
+
+[logs]
+models/logs/train/
+models/logs/validation/
+models/test/**/*.h5

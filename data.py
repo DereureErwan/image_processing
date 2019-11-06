@@ -47,13 +47,19 @@ class Data:
         self.iteration = iteration
 
     def _load_images(self):
-        self.train = io.imread(self.TRAIN_DATA) / 255
+        all_data = io.imread(self.TRAIN_DATA) / 255
+        all_labels = io.imread(self.TRAIN_LABELS) / 255
+        self.train = all_data[:23, :, :]
+        self.validation = all_data[23:, :, :]
+        self.labels = all_labels[:23, :, :]
+        self.labels_validation = all_data[23:, :, :]
         self.n_samples = self.train.shape[0]
-        self.labels = io.imread(self.TRAIN_LABELS) / 255
         self.test = io.imread(self.TEST_DATA) / 255
         self.size = self.train.shape[1]
         if self.custom_loss:
-            self.weights = LossWeights()()
+            all_weights = LossWeights()()
+            self.weights = all_weights[:23, :, :]
+            self.weights_validation = all_data[23:, :, :]
 
     def _data_augmentation(self, X, y):
         if (self.sigma is not None) and (self.points is not None):
@@ -68,19 +74,22 @@ class Data:
             y = np.where(y <= 0.5, 0, 1)
         return X, y
 
-    def generator(self, train=True):
+    def generator(self, train=True, validation=False):
         # TODO: Accept batch size of more than one
+        data_type = "validation" if validation else "train"
+        label_type = "labels_validation" if validation else "labels"
+        weight_type = "weights_validation" if validation else "weights"
         while True:
             idx = np.arange(0, self.n_samples)
             if self.shuffle:
                 idx = np.random.shuffle(idx)
             for s in idx:
-                img = self.train[s]
+                img = getattr(self, data_type)[s]
                 if train:
-                    label = self.labels[s]
+                    label = getattr(self, label_type)[s]
                     img, label = self._data_augmentation(img, label)
                     if self.custom_loss:
-                        weights = self.weights[s]
+                        weights = getattr(self, weight_type)[s]
                 img = np.pad(img, self.extension, mode='reflect')
                 for i in range(self.iteration):
                     for j in range(self.iteration):
