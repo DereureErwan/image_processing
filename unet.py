@@ -37,7 +37,17 @@ def make_unet(
 
 
 class UNet:
+    """
+    Defines our U-Net
 
+    Args:
+        lr: float, default=0.001
+            learning rate for SGD
+        momentum: float: default=0.99
+            momentum for SGD
+        dropout: float, default=0.3
+            probability of dropout for contracting path
+    """
     def __init__(
         self,
         input_shape=(572, 572, 1),
@@ -60,6 +70,7 @@ class UNet:
         self,
         inputs,
         filters,
+        name,
         kernel=(3, 3),
         activation='relu',
     ):
@@ -71,15 +82,17 @@ class UNet:
             kernel,
             activation=activation,
             kernel_initializer='he_normal',
+            name=name,
         )(inputs)
         if self.batch_normalisation:
             x = BatchNormalization()(x)
         return x
 
-    def __UpConv2D(self, inputs, filters, kernel=(2, 2)):
+    def __UpConv2D(self, inputs, filters, name, kernel=(2, 2)):
         x = Conv2D(
             filters,
             kernel,
+            name=name,
             padding='same',
             kernel_initializer='he_normal',
         )(UpSampling2D(size=(2, 2))(inputs))
@@ -108,75 +121,71 @@ class UNet:
             return tf.math.reduce_mean(- bce, axis=-1)
         return weighted_binary_crossentropy
 
-    def __call__(self):
-        """
-        Defines our U-Net
+    @staticmethod
+    def debug(X):
+        import ipdb; ipdb.set_trace()
+        return X
 
-        Args:
-            lr: float, default=0.001
-                learning rate for SGD
-            momentum: float: default=0.99
-                momentum for SGD
-            dropout: float, default=0.3
-                probability of dropout for contracting path
-        """
+    def __call__(self):
         images = Input(shape=self.input_shape)
-        loss_weights = Input(shape=(68, 68, 1))
+        if self.custom_loss:
+            loss_weights = Input(shape=(68, 68, 1))
 
         """""""""""""""""""""""""""""""""""""""""""""""""""
         """""""""""""""" Contracting Path """""""""""""""""
         """""""""""""""""""""""""""""""""""""""""""""""""""
 
-        conv1 = self.__Conv2D(images, 64)
-        conv1 = self.__Conv2D(conv1, 64)
+        conv1 = self.__Conv2D(images, 64, 'conv11')
+        conv1 = self.__Conv2D(conv1, 64, 'conv12')
         pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
         drop1 = Dropout(self.dropout)(pool1)
 
-        conv2 = self.__Conv2D(drop1, 128)
-        conv2 = self.__Conv2D(conv2, 128)
+        conv2 = self.__Conv2D(drop1, 128, 'conv21')
+        conv2 = self.__Conv2D(conv2, 128, 'conv22')
         pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
         drop2 = Dropout(self.dropout)(pool2)
 
-        conv3 = self.__Conv2D(drop2, 256)
-        conv3 = self.__Conv2D(conv3, 256)
+        conv3 = self.__Conv2D(drop2, 256, 'conv31')
+        conv3 = self.__Conv2D(conv3, 256, 'conv32')
         pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
         drop3 = Dropout(self.dropout)(pool3)
 
-        conv4 = self.__Conv2D(drop3, 512)
-        conv4 = self.__Conv2D(conv4, 512)
+        conv4 = self.__Conv2D(drop3, 512, 'conv41')
+        conv4 = self.__Conv2D(conv4, 512, 'conv42')
         pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
         drop4 = Dropout(self.dropout)(pool4)
 
-        conv5 = self.__Conv2D(drop4, 1024)
-        conv5 = self.__Conv2D(conv5, 1024)
-        upsam5 = self.__UpConv2D(conv5, 512)
+        conv5 = self.__Conv2D(drop4, 1024, 'conv51')
+        conv5 = self.__Conv2D(conv5, 1024, 'conv52')
+        upsam5 = self.__UpConv2D(conv5, 512, 'upconv5')
 
         """""""""""""""""""""""""""""""""""""""""""""""""""""""""
         """""""""""""""""" Expansive Path """""""""""""""""""""""
         """"""""""""""""""""""""""""""""""""""""""""""""""""""""
 
         conc6 = self.__copycrop_and_concatenate(conv4, upsam5)
-        conv6 = self.__Conv2D(conc6, 512)
-        conv6 = self.__Conv2D(conv6, 512)
-        upsam6 = self.__UpConv2D(conv6, 512)
+        conv6 = self.__Conv2D(conc6, 512, 'conv61')
+        conv6 = self.__Conv2D(conv6, 512, 'conv62')
+        upsam6 = self.__UpConv2D(conv6, 512, 'upconv6')
 
         conc7 = self.__copycrop_and_concatenate(conv3, upsam6)
-        conv7 = self.__Conv2D(conc7, 256)
-        conv7 = self.__Conv2D(conv7, 256)
-        upsam7 = self.__UpConv2D(conv7, 512)
+        conv7 = self.__Conv2D(conc7, 256, 'conv71')
+        conv7 = self.__Conv2D(conv7, 256, 'conv72')
+        upsam7 = self.__UpConv2D(conv7, 512, 'upconv7')
 
         conc8 = self.__copycrop_and_concatenate(conv2, upsam7)
-        conv8 = self.__Conv2D(conc8, 128)
-        conv8 = self.__Conv2D(conv8, 128)
-        upsam8 = self.__UpConv2D(conv8, 512)
+        conv8 = self.__Conv2D(conc8, 128, 'conv81')
+        conv8 = self.__Conv2D(conv8, 128, 'conv82')
+        upsam8 = self.__UpConv2D(conv8, 512, 'upconv8')
 
         conc9 = self.__copycrop_and_concatenate(conv1, upsam8)
-        conv9 = self.__Conv2D(conc9, 64)
-        conv9 = self.__Conv2D(conv9, 64)
+        conv9 = self.__Conv2D(conc9, 64, 'conv91')
+        conv9 = self.__Conv2D(conv9, 64, 'conv92')
 
         conv10 = self.__Conv2D(
             conv9,
-            1, kernel=(1, 1),
+            1, 'outconv10',
+            kernel=(1, 1),
             activation='softmax',
         )
 
